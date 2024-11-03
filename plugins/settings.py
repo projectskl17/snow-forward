@@ -411,6 +411,91 @@ async def settings_query(bot, query):
     elif type.startswith("alert"):
         alert = type.split('_')[1]
         await query.answer(alert, show_alert=True)
+    elif type == "time":
+        buttons = []
+        data = await get_configs(user_id)
+        delete_time = data['delete_time']
+        if delete_time is None or delete_time == 0:
+            buttons.append([InlineKeyboardButton('✚ Set Delete Time ✚', callback_data="settings#addtime")])
+        else:
+            buttons.append([InlineKeyboardButton('See Delete Time', callback_data="settings#seetime")])
+            buttons[-1].append(InlineKeyboardButton('🗑️ Delete Delete Time', callback_data="settings#deletetime"))
+        buttons.append([InlineKeyboardButton('⟪ back', callback_data="settings#main")])
+        await query.message.edit_text("<b><u>DELETE TIME</b></u>\n\n<b>Set a custom delay time for message deletion after forwarding. If not set, messages will not auto-delete.</b>", reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "seetime":
+        data = await get_configs(user_id)
+        delete_time = data.get('delete_time', 'Not set')
+        buttons = [[InlineKeyboardButton('🖋️ Edit Delete Time', callback_data="settings#addtime")],
+                   [InlineKeyboardButton('⟪ back', callback_data="settings#time")]]
+        await query.message.edit_text(
+            f"<b><u>CURRENT DELETE TIME</b></u>\n\n<code>{delete_time}</code> seconds",
+            reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "deletetime":
+        await update_configs(user_id, 'delete_time', None)
+        buttons = [[InlineKeyboardButton('⟪ back', callback_data="settings#time")]]
+        await query.message.edit_text("<b>Delete time successfully removed.</b>",
+                                      reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "addtime":
+        await query.message.delete()
+        time_response = await bot.ask(query.message.chat.id, text="Send the delete time in seconds (e.g., 60 for 1 minute).\n/cancel - <code>cancel this process</code>")
+        if time_response.text == "/cancel":
+            return await time_response.reply_text(
+                "<b>Process canceled!</b>",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#time")]]))
+        try:
+            delete_time = int(time_response.text)
+            if delete_time <= 0:
+                raise ValueError("Delete time must be a positive integer.")
+        except ValueError:
+            return await time_response.reply_text(
+                "<b>Invalid delete time. Please enter a positive number.</b>",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#time")]]))
+        await update_configs(user_id, 'delete_time', delete_time)
+        await time_response.reply_text("<b>Delete time successfully set.</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#time")]]))
+    elif type == "batch":
+        buttons = []
+        data = await get_configs(user_id)
+        batch_size = data.get('batch', 100)
+        
+        if batch_size == 0:
+            buttons.append([InlineKeyboardButton('✚ Set Batch Size ✚', callback_data="settings#addbatch")])
+        else:
+            buttons.append([InlineKeyboardButton('Edit Batch Size', callback_data="settings#seebatch")])
+            buttons[-1].append(InlineKeyboardButton('🔁 Set to Default', callback_data="settings#setdefault"))
+        buttons.append([InlineKeyboardButton('⟪ back', callback_data="settings#main")])
+        await query.message.edit_text("<b><u>BATCH SIZE</b></u>\n\n<b>Set the number of messages to be sent in a batch. If not set, messages will be sent individually (default is 100).</b>", reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "seebatch":
+        data = await get_configs(user_id)
+        batch_size = data.get('batch', 100)
+        buttons = [
+            [InlineKeyboardButton('🖋️ Edit Batch Size', callback_data="settings#addbatch")],
+            [InlineKeyboardButton('↩️ Set to Default', callback_data="settings#deletebatch")],
+            [InlineKeyboardButton('⟪ back', callback_data="settings#batch")]]
+            
+        await query.message.edit_text(
+            f"<b><u>CURRENT BATCH SIZE</b></u>\n\n<code>{batch_size}</code> messages",
+            reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "setdefault":
+        await update_configs(user_id, 'batch', 100)
+        buttons = [[InlineKeyboardButton('⟪ back', callback_data="settings#batch")]]
+        await query.message.edit_text("<b>Batch size set to default (100).</b>", reply_markup=InlineKeyboardMarkup(buttons))
+    elif type == "addbatch":
+        await query.message.delete()
+        batch_response = await bot.ask(query.message.chat.id, text="Send the batch size (default is 100, e.g., 10 for sending 10 messages at a time).\n/cancel - <code>cancel this process</code>")
+        if batch_response.text == "/cancel":
+            return await batch_response.reply_text(
+                "<b>Process canceled!</b>",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#batch")]]))
+        try:
+            batch_size = int(batch_response.text)
+            if batch_size <= 0:
+                raise ValueError("Batch size must be a positive integer.")
+        except ValueError:
+            return await batch_response.reply_text(
+                "<b>Invalid batch size. Please enter a positive number.</b>",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#batch")]]))
+        await update_configs(user_id, 'batch', batch_size)
+        await batch_response.reply_text("<b>Batch size successfully set.</b>", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⟪ back', callback_data="settings#batch")]]))
 
 
 def main_buttons():
@@ -588,6 +673,12 @@ async def extra_filters_buttons(user_id):
     ], [
         InlineKeyboardButton('♦️ ᴋᴇʏᴡᴏʀᴅs ♦️',
                              callback_data='settings#get_keyword')
+    ], [
+        InlineKeyboardButton('⏲️ ᴅᴇʟᴇᴛᴇ ᴛɪᴍᴇ',
+                             callback_data='settings#time')
+    ], [
+        InlineKeyboardButton('📦 Bᴀᴛᴄʜ Sɪᴢᴇ',
+                             callback_data='settings#batch')
     ], [
         InlineKeyboardButton('⟪ back',
                              callback_data="settings#main")

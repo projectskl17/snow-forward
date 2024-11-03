@@ -34,7 +34,7 @@ async def pub_(bot, message):
     if i.TO in temp.IS_FRWD_CHAT:
         return await message.answer("In Target chat a task is progressing. please wait until task complete", show_alert=True)
     m = await msg_edit(message.message, "<b>verifying your data's, please wait.</b>")
-    _bot, caption, forward_tag, data, protect, button = await sts.get_data(user)
+    _bot, caption, delete_time, batch, forward_tag, data, protect, button = await sts.get_data(user)
     if not _bot:
         return await msg_edit(m, "<b>You didn't added any bot. Please add a bot using /settings !</b>", wait=True)
     try:
@@ -92,9 +92,9 @@ async def pub_(bot, message):
                     MSG.append(message.id)
                     notcompleted = len(MSG)
                     completed = sts.get('total') - sts.get('fetched')
-                    if (notcompleted >= 100
-                            or completed <= 100):
-                        await forward(client, MSG, m, sts, protect)
+                    if (notcompleted >= batch
+                            or completed <= batch):
+                        await forward(client, MSG, m, sts, protect, delete_time)
                         sts.add('total_files', notcompleted)
                         await asyncio.sleep(10)
                         MSG = []
@@ -102,7 +102,7 @@ async def pub_(bot, message):
                     new_caption = custom_caption(message, caption)
                     details = {"msg_id": message.id, "media": media(
                         message), "caption": new_caption, 'button': button, "protect": protect}
-                    await copy(client, details, m, sts)
+                    await copy(client, details, m, sts, delete_time)
                     sts.add('total_files')
                     await asyncio.sleep(sleep)
         except Exception as e:
@@ -113,7 +113,6 @@ async def pub_(bot, message):
         await send(client, user, "<b>🎉 ғᴏʀᴡᴀᴅɪɴɢ ᴄᴏᴍᴘʟᴇᴛᴇᴅ 🥀</b>")
         await edit(m, 'ᴄᴏᴍᴘʟᴇᴛᴇᴅ', "completed", sts)
         await stop(client, user)
-
 
 
 @Client.on_callback_query(filters.regex(r'^start_private'))
@@ -131,7 +130,7 @@ async def private(bot, message):
     if i.TO in temp.IS_FRWD_CHAT:
         return await message.answer("In Target chat a task is progressing. please wait until task complete", show_alert=True)
     m = await msg_edit(message.message, "<b>verifying your data's, please wait.</b>")
-    _user, caption, forward_tag, data, protect, button = await sts.get_data_private(user)
+    _user, caption, delete_time, batch, forward_tag, data, protect, button = await sts.get_data_private(user)
     
     if not _user:
         return await msg_edit(m, "<b>You didn't added any bot. Please add a bot using /settings !</b>", wait=True)
@@ -190,9 +189,9 @@ async def private(bot, message):
                     MSG.append(message.id)
                     notcompleted = len(MSG)
                     completed = sts.get('total') - sts.get('fetched')
-                    if (notcompleted >= 100
-                            or completed <= 100):
-                        await forward(client, MSG, m, sts, protect)
+                    if (notcompleted >= batch
+                            or completed <= batch):
+                        await forward(client, MSG, m, sts, protect, delete_time)
                         sts.add('total_files', notcompleted)
                         await asyncio.sleep(10)
                         MSG = []
@@ -200,7 +199,7 @@ async def private(bot, message):
                     new_caption = custom_caption(message, caption)
                     details = {"msg_id": message.id, "media": media(
                         message), "caption": new_caption, 'button': button, "protect": protect}
-                    await copy(client, details, m, sts)
+                    await copy(client, details, m, sts, delete_time)
                     sts.add('total_files')
                     await asyncio.sleep(sleep)
         except Exception as e:
@@ -213,23 +212,30 @@ async def private(bot, message):
         await stop(client, user)
 
 
-async def copy(bot, msg, m, sts):
+async def copy(bot, msg, m, sts, delete_time):
     try:
         if msg.get("media") and msg.get("caption"):
-            await bot.send_cached_media(
+            sent_message = await bot.send_cached_media(
                 chat_id=sts.get('TO'),
                 file_id=msg.get("media"),
                 caption=msg.get("caption"),
                 reply_markup=msg.get('button'),
-                protect_content=msg.get("protect"))
+                protect_content=msg.get("protect")
+            )
         else:
-            await bot.copy_message(
+            sent_message = await bot.copy_message(
                 chat_id=sts.get('TO'),
                 from_chat_id=sts.get('FROM'),
                 caption=msg.get("caption"),
                 message_id=msg.get("msg_id"),
                 reply_markup=msg.get('button'),
-                protect_content=msg.get("protect"))
+                protect_content=msg.get("protect")
+            )
+        
+        if delete_time > 0:
+            await asyncio.sleep(delete_time)
+            await sent_message.delete()
+    
     except FloodWait as e:
         await edit(m, 'ᴘʀᴏɢʀᴇssɪɴɢ', e.value, sts)
         await asyncio.sleep(e.value)
@@ -240,18 +246,28 @@ async def copy(bot, msg, m, sts):
         sts.add('deleted')
 
 
-async def forward(bot, msg, m, sts, protect):
+async def forward(bot, msg, m, sts, protect, delete_time):
     try:
-        await bot.forward_messages(
+        sent_message = await bot.forward_messages(
             chat_id=sts.get('TO'),
             from_chat_id=sts.get('FROM'),
             protect_content=protect,
-            message_ids=msg)
+            message_ids=msg
+        )
+        
+        if delete_time > 0:
+            await asyncio.sleep(delete_time)
+            await sent_message.delete()
+
     except FloodWait as e:
         await edit(m, 'ᴘʀᴏɢʀᴇssɪɴɢ', e.value, sts)
         await asyncio.sleep(e.value)
         await edit(m, 'ᴘʀᴏɢʀᴇssɪɴɢ', 10, sts)
         await forward(bot, msg, m, sts, protect)
+    except Exception as e:
+        print(e)
+        sts.add('deleted')
+
 
 PROGRESS = """
 📈 Percetage: {0} %
