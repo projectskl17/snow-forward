@@ -212,7 +212,7 @@ async def private(bot, message):
         await stop(client, user)
 
 
-async def copy(bot, msg, m, sts, delete_time):
+async def copy(bot, msg, m, sts, delete_time=0):
     try:
         if msg.get("media") and msg.get("caption"):
             sent_message = await bot.send_cached_media(
