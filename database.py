@@ -77,7 +77,7 @@ class Database:
     async def get_configs(self, id):
         default = {
             'delete_time': 0,
-            'batch': 0,
+            'batch': 100,
             'caption': None,
             'duplicate': True,
             'forward_tag': False,
